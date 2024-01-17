@@ -13,7 +13,6 @@ export const createProduct = async (
   try {
     const { title, description, price, categoryId } = req.body;
     const image = req.files?.image;
-    console.log(image);
 
     if (!image) {
       return res.status(400).json({ message: "Image not found" });
@@ -116,32 +115,54 @@ export const putProduct = async (
     const { id } = req.params;
     const { title, description, price } = req.body;
     const image = req.files?.image;
-  
+
     const extname = Array.isArray(image)
       ? image[0].mimetype.split("/")[1]
       : image?.mimetype.split("/")[1];
 
     const imageName = `${v4()}.${extname}`;
 
-    // Check if the product exists
     const existingProduct = await Product.findOne({ where: { id } });
+
+    const imagePath = existingProduct?.dataValues.image;
+
     if (!existingProduct) {
       return res.status(404).json({ message: "Product not found" });
+    }
+    const filePath = path.join(process.cwd(), "uploads", imagePath);
+    
+    if (image) {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log("Image file deleted successfully");
+      } else {
+        res.status(403).json({ message: "Image file does not exist" });
+      }
     }
 
     let updatedImageName = existingProduct.image;
 
-    // Move the new image to the uploads folder if it exists
     if (Array.isArray(image)) {
       image[0].mv(`${process.cwd()}/uploads/${imageName}`);
       updatedImageName = imageName;
+
+      // Delete the old image if it exists
+      if (existingProduct.image) {
+        fs.unlinkSync(`${process.cwd()}/uploads/${existingProduct.image}`);
+      }
     } else {
       if (image) {
         image.mv(`${process.cwd()}/uploads/${imageName}`);
         updatedImageName = imageName;
+
+        // Delete the old image if it exists
+        if (existingProduct.image) {
+          fs.unlinkSync(`${process.cwd()}/uploads/${existingProduct.image}`);
+        }
       }
     }
 
+    // Uncomment the following lines when you are ready to update the product in the database
     await Product.update(
       {
         image: updatedImageName,
